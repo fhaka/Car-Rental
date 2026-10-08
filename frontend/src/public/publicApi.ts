@@ -42,6 +42,8 @@ export interface PublicVehicle {
   status: VehicleStatus;
   category: PublicCategory;
   images: PublicVehicleImage[];
+  /** Present only when the request included a date window: is the car free for it? */
+  available?: boolean;
 }
 
 export interface PublicCompany {
@@ -132,8 +134,10 @@ export const publicApi = {
     const { data } = await publicClient.get<Paginated<PublicVehicle>>("/public/vehicles", { params });
     return data;
   },
-  async getVehicle(id: string): Promise<PublicVehicle> {
-    const { data } = await publicClient.get<{ vehicle: PublicVehicle }>(`/public/vehicles/${id}`);
+  async getVehicle(id: string, dates?: { pickupAt?: string; returnAt?: string }): Promise<PublicVehicle> {
+    const params =
+      dates?.pickupAt && dates?.returnAt ? { pickupAt: dates.pickupAt, returnAt: dates.returnAt } : undefined;
+    const { data } = await publicClient.get<{ vehicle: PublicVehicle }>(`/public/vehicles/${id}`, { params });
     return data.vehicle;
   },
   async createBooking(payload: CreateBookingPayload): Promise<BookingConfirmation> {

@@ -13,7 +13,8 @@ export const publicController = {
     res.json(await publicService.listVehicles(req.query as never));
   }),
   getVehicle: asyncHandler(async (req: Request, res: Response) => {
-    res.json(await publicService.getVehicle(req.params.id));
+    const { pickupAt, returnAt } = req.query as unknown as { pickupAt?: Date; returnAt?: Date };
+    res.json(await publicService.getVehicle(req.params.id, { pickupAt, returnAt }));
   }),
   createBooking: asyncHandler(async (req: Request, res: Response) => {
     const result = await publicService.createBooking(req.body);

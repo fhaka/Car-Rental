@@ -71,7 +71,7 @@ export function FleetPage() {
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Our fleet</h1>
           <p className="mt-1.5 text-slate-500">
-            {meta ? `${meta.total} vehicle${meta.total === 1 ? "" : "s"} available` : "Loading vehicles…"}
+            {meta ? `${meta.total} vehicle${meta.total === 1 ? "" : "s"}${pickupAt && returnAt ? " in the fleet" : " available"}` : "Loading vehicles…"}
             {pickupAt && returnAt && (
               <span className="ml-1 text-slate-400">
                 · {formatDate(pickupAt)} → {formatDate(returnAt)}

@@ -31,6 +31,20 @@ export const listPublicVehiclesQuerySchema = z
     }
   });
 
+export const publicVehicleQuerySchema = z
+  .object({
+    pickupAt: z.coerce.date().optional(),
+    returnAt: z.coerce.date().optional(),
+  })
+  .superRefine((d, ctx) => {
+    if (Boolean(d.pickupAt) !== Boolean(d.returnAt)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Pickup and return dates must be provided together", path: ["returnAt"] });
+    }
+    if (d.pickupAt && d.returnAt && d.returnAt <= d.pickupAt) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Return date must be after pickup date", path: ["returnAt"] });
+    }
+  });
+
 export const createPublicBookingSchema = z
   .object({
     vehicleId: z.string().uuid(),

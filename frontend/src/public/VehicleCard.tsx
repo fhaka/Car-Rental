@@ -9,9 +9,11 @@ import { PublicVehicle, VehicleStatus, fuelLabel, transmissionLabel } from "./pu
  * the API only returns cars that are free for it, so every card is available
  * "for your dates". Otherwise we reflect the vehicle's current real-world status.
  */
-export function availabilityBadge(status: VehicleStatus, hasDates: boolean) {
+export function availabilityBadge(status: VehicleStatus, hasDates: boolean, available?: boolean) {
   if (hasDates) {
-    return { label: "Available for your dates", dot: "bg-emerald-500", text: "text-emerald-700", live: true };
+    return available === false
+      ? { label: "Unavailable for your dates", dot: "bg-rose-500", text: "text-rose-600", live: false }
+      : { label: "Available for your dates", dot: "bg-emerald-500", text: "text-emerald-700", live: true };
   }
   switch (status) {
     case "AVAILABLE":
@@ -40,12 +42,16 @@ export function VehicleCard({
   const query = bookParams.toString() ? `?${bookParams.toString()}` : "";
 
   const hasDates = Boolean(dates?.pickupAt && dates?.returnAt);
-  const badge = availabilityBadge(vehicle.status, hasDates);
+  const unavailable = hasDates && vehicle.available === false;
+  const badge = availabilityBadge(vehicle.status, hasDates, vehicle.available);
 
   return (
     <div className="group flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-card transition-all hover:-translate-y-1 hover:shadow-lg">
       <Link to={`/fleet/${vehicle.id}${query}`} className="relative block aspect-[16/10] overflow-hidden">
-        <CarImage vehicle={vehicle} className="transition-transform duration-500 group-hover:scale-105" />
+        <CarImage
+          vehicle={vehicle}
+          className={`transition-transform duration-500 group-hover:scale-105 ${unavailable ? "opacity-50 grayscale" : ""}`}
+        />
         <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur">
           {vehicle.category.name}
         </span>
@@ -89,9 +95,15 @@ export function VehicleCard({
           <Link to={`/fleet/${vehicle.id}${query}`} className="btn-secondary flex-1">
             Details
           </Link>
-          <Link to={`/book/${vehicle.id}${query}`} className="btn-primary flex-1">
-            Book
-          </Link>
+          {unavailable ? (
+            <button type="button" disabled className="btn-primary flex-1" title="Not available for your selected dates">
+              Unavailable
+            </button>
+          ) : (
+            <Link to={`/book/${vehicle.id}${query}`} className="btn-primary flex-1">
+              Book
+            </Link>
+          )}
         </div>
       </div>
     </div>

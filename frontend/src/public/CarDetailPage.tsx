@@ -20,8 +20,8 @@ export function CarDetailPage() {
   const bookHref = `/book/${id}${bookQuery.toString() ? `?${bookQuery.toString()}` : ""}`;
 
   const vehicleQuery = useQuery({
-    queryKey: ["public", "vehicle", id],
-    queryFn: () => publicApi.getVehicle(id!),
+    queryKey: ["public", "vehicle", id, pickupAt, returnAt],
+    queryFn: () => publicApi.getVehicle(id!, { pickupAt, returnAt }),
     enabled: Boolean(id),
   });
 
@@ -138,12 +138,28 @@ export function CarDetailPage() {
                 </div>
               </dl>
 
-              <Link to={bookHref} className="btn-primary mt-6 w-full py-3 text-base">
-                Book this car
-              </Link>
-              <p className="mt-3 text-center text-xs text-slate-400">
-                You won't be charged yet — we confirm your booking first.
-              </p>
+              {pickupAt && returnAt && v.available === false ? (
+                <>
+                  <div className="mt-6 rounded-lg bg-rose-50 px-4 py-3 text-center text-sm font-medium text-rose-700">
+                    Not available for your selected dates.
+                  </div>
+                  <button type="button" disabled className="btn-primary mt-3 w-full py-3 text-base">
+                    Unavailable for these dates
+                  </button>
+                  <Link to="/fleet" className="mt-3 block text-center text-sm font-medium text-brand-600 hover:text-brand-700">
+                    Try different dates →
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link to={bookHref} className="btn-primary mt-6 w-full py-3 text-base">
+                    Book this car
+                  </Link>
+                  <p className="mt-3 text-center text-xs text-slate-400">
+                    You won't be charged yet — we confirm your booking first.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>

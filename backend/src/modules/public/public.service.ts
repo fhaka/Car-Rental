@@ -122,13 +122,6 @@ export const publicService = {
         : {}),
     };
 
-    // When a date window is supplied, hide anything already booked for it so the
-    // catalogue only shows cars the customer can actually reserve.
-    if (q.pickupAt && q.returnAt) {
-      const conflicting = await findConflictingVehicleIds(prisma, q.pickupAt, q.returnAt);
-      if (conflicting.size > 0) where.id = { notIn: Array.from(conflicting) };
-    }
-
     const orderBy: Prisma.VehicleOrderByWithRelationInput =
       q.sort === "price_desc" ? { dailyRate: "desc" } : q.sort === "newest" ? { year: "desc" } : { dailyRate: "asc" };
 
@@ -137,13 +130,33 @@ export const publicService = {
       prisma.vehicle.count({ where }),
     ]);
 
-    return { data: data.map(serializeVehicle), meta: buildPaginationMeta(q.page, q.pageSize, total) };
+    // When a date window is supplied, we still return every rentable car but flag
+    // which ones are free for it, so the UI can show them with booking disabled.
+    let conflicting: Set<string> | null = null;
+    if (q.pickupAt && q.returnAt) {
+      conflicting = await findConflictingVehicleIds(prisma, q.pickupAt, q.returnAt);
+    }
+
+    return {
+      data: data.map((v) => {
+        const serialized = serializeVehicle(v);
+        return conflicting ? { ...serialized, available: !conflicting.has(v.id) } : serialized;
+      }),
+      meta: buildPaginationMeta(q.page, q.pageSize, total),
+    };
   },
 
-  async getVehicle(id: string) {
+  async getVehicle(id: string, window?: { pickupAt?: Date; returnAt?: Date }) {
     const vehicle = await prisma.vehicle.findUnique({ where: { id }, select: PUBLIC_VEHICLE_SELECT });
     if (!vehicle || vehicle.status === "INACTIVE") throw AppError.notFound("Vehicle not found");
-    return { vehicle: serializeVehicle(vehicle) };
+    const serialized = serializeVehicle(vehicle);
+
+    // If a date window is given, report whether this car is free for it.
+    if (window?.pickupAt && window?.returnAt) {
+      const conflicting = await findConflictingVehicleIds(prisma, window.pickupAt, window.returnAt);
+      return { vehicle: { ...serialized, available: !conflicting.has(vehicle.id) } };
+    }
+    return { vehicle: serialized };
   },
 
   /**

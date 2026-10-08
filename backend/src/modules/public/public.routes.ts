@@ -3,7 +3,7 @@ import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { validate } from "../../middleware/validate";
 import { publicController } from "./public.controller";
-import { createPublicBookingSchema, listPublicVehiclesQuerySchema } from "./public.schemas";
+import { createPublicBookingSchema, listPublicVehiclesQuerySchema, publicVehicleQuerySchema } from "./public.schemas";
 
 /**
  * Customer-facing, UNAUTHENTICATED API that powers the public website.
@@ -26,7 +26,11 @@ const publicBookingLimiter = rateLimit({
 publicRouter.get("/company", publicController.company);
 publicRouter.get("/categories", publicController.categories);
 publicRouter.get("/vehicles", validate({ query: listPublicVehiclesQuerySchema }), publicController.listVehicles);
-publicRouter.get("/vehicles/:id", validate({ params: idParams }), publicController.getVehicle);
+publicRouter.get(
+  "/vehicles/:id",
+  validate({ params: idParams, query: publicVehicleQuerySchema }),
+  publicController.getVehicle
+);
 publicRouter.post(
   "/bookings",
   publicBookingLimiter,
