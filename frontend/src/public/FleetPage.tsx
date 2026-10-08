@@ -42,6 +42,11 @@ export function FleetPage() {
     queryKey: ["public", "vehicles", query],
     queryFn: () => publicApi.listVehicles(query),
     placeholderData: keepPreviousData,
+    // Keep the availability badges current: refetch periodically and whenever
+    // the visitor returns to the tab.
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
   function setFilter(key: string, value?: string) {

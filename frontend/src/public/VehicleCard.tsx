@@ -2,7 +2,28 @@ import { Link } from "react-router-dom";
 import { Fuel, Gauge, Users } from "lucide-react";
 import { formatCurrency } from "../lib/format";
 import { CarImage } from "./CarImage";
-import { PublicVehicle, fuelLabel, transmissionLabel } from "./publicApi";
+import { PublicVehicle, VehicleStatus, fuelLabel, transmissionLabel } from "./publicApi";
+
+/**
+ * Availability shown on the card. When the customer has searched a date window,
+ * the API only returns cars that are free for it, so every card is available
+ * "for your dates". Otherwise we reflect the vehicle's current real-world status.
+ */
+export function availabilityBadge(status: VehicleStatus, hasDates: boolean) {
+  if (hasDates) {
+    return { label: "Available for your dates", dot: "bg-emerald-500", text: "text-emerald-700", live: true };
+  }
+  switch (status) {
+    case "AVAILABLE":
+      return { label: "Available now", dot: "bg-emerald-500", text: "text-emerald-700", live: true };
+    case "RESERVED":
+      return { label: "Reserved", dot: "bg-amber-500", text: "text-amber-700", live: false };
+    case "RENTED":
+      return { label: "Rented out", dot: "bg-slate-400", text: "text-slate-600", live: false };
+    default:
+      return { label: "Available", dot: "bg-emerald-500", text: "text-emerald-700", live: true };
+  }
+}
 
 export function VehicleCard({
   vehicle,
@@ -18,12 +39,24 @@ export function VehicleCard({
   if (dates?.returnAt) bookParams.set("returnAt", dates.returnAt);
   const query = bookParams.toString() ? `?${bookParams.toString()}` : "";
 
+  const hasDates = Boolean(dates?.pickupAt && dates?.returnAt);
+  const badge = availabilityBadge(vehicle.status, hasDates);
+
   return (
     <div className="group flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-card transition-all hover:-translate-y-1 hover:shadow-lg">
       <Link to={`/fleet/${vehicle.id}${query}`} className="relative block aspect-[16/10] overflow-hidden">
         <CarImage vehicle={vehicle} className="transition-transform duration-500 group-hover:scale-105" />
         <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur">
           {vehicle.category.name}
+        </span>
+        <span className="absolute right-3 top-3 inline-flex max-w-[calc(100%-1.5rem)] items-center gap-1.5 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold shadow-sm backdrop-blur">
+          <span className="relative flex h-2 w-2 shrink-0">
+            {badge.live && (
+              <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${badge.dot} opacity-75`} />
+            )}
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${badge.dot}`} />
+          </span>
+          <span className={`truncate ${badge.text}`}>{badge.label}</span>
         </span>
       </Link>
       <div className="flex flex-1 flex-col p-5">
