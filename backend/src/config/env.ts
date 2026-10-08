@@ -17,6 +17,18 @@ const envSchema = z.object({
   JSON_BODY_LIMIT: z.string().default("1mb"),
   LOG_LEVEL: z.string().default("info"),
   UPLOAD_DIR: z.string().default("uploads"),
+
+  // Transactional email (SMTP). All optional: with no SMTP_HOST the app uses a
+  // dev fallback that logs emails instead of sending them, so booking and
+  // password-reset flows work out of the box without a mail provider.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().default(587),
+  SMTP_SECURE: z.preprocess((v) => (v === undefined ? false : v === "true" || v === "1"), z.boolean()),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  MAIL_FROM: z.string().default('"V Car Rent" <no-reply@vcarrent.al>'),
+  // Base URL of the frontend, used to build links in emails (e.g. password reset).
+  APP_URL: z.string().url().default("http://localhost:5173"),
 });
 
 function loadEnv() {

@@ -7,6 +7,7 @@ import { buildPaginationMeta, paginationSkipTake } from "../../utils/pagination"
 import { findConflictingVehicleIds } from "../availability/availability.service";
 import { bookingsService } from "../bookings/bookings.service";
 import { settingsService } from "../settings/settings.service";
+import { sendBookingReceivedEmail } from "../../lib/emails";
 import { ListPublicVehiclesQuery, CreatePublicBookingInput } from "./public.schemas";
 
 /**
@@ -191,6 +192,21 @@ export const publicService = {
       },
       systemUserId
     );
+
+    // Email the customer their booking request confirmation (non-blocking).
+    void sendBookingReceivedEmail({
+      bookingNumber: booking.bookingNumber,
+      customerFirstName: customer.firstName,
+      customerEmail: customer.email,
+      vehicle: { brand: booking.vehicle.brand, model: booking.vehicle.model, year: booking.vehicle.year },
+      pickupAt: booking.pickupAt,
+      returnAt: booking.returnAt,
+      pickupLocation: booking.pickupLocation,
+      returnLocation: booking.returnLocation,
+      rentalDays: booking.rentalDays,
+      totalAmount: toNumber(booking.totalAmount),
+      securityDeposit: toNumber(booking.securityDeposit),
+    });
 
     // Confirmation-safe subset for the customer.
     return {

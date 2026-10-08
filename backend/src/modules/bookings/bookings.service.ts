@@ -7,6 +7,7 @@ import { computeBookingTotals, computeRentalDays } from "../../utils/pricing";
 import { toNumber } from "../../utils/money";
 import { findConflictingVehicleIds } from "../availability/availability.service";
 import { settingsService } from "../settings/settings.service";
+import { sendBookingConfirmedEmail } from "../../lib/emails";
 import { CreateBookingInput, ListBookingsQuery, UpdateBookingInput } from "./bookings.schemas";
 
 const INCLUDE_DEFAULT = {
@@ -211,8 +212,8 @@ export const bookingsService = {
       );
     }
 
-    return prisma.$transaction(async (tx) => {
-      const booking = await tx.booking.update({
+    const booking = await prisma.$transaction(async (tx) => {
+      const updated = await tx.booking.update({
         where: { id },
         data: { status, notes: reason ? `${existing.notes ?? ""}\n[${status}] ${reason}`.trim() : existing.notes },
         include: INCLUDE_DEFAULT,
@@ -230,7 +231,26 @@ export const bookingsService = {
         }
       }
 
-      return booking;
+      return updated;
     });
+
+    // Let the customer know once the booking is confirmed (non-blocking).
+    if (status === BookingStatus.CONFIRMED && booking.customer?.email) {
+      void sendBookingConfirmedEmail({
+        bookingNumber: booking.bookingNumber,
+        customerFirstName: booking.customer.firstName,
+        customerEmail: booking.customer.email,
+        vehicle: { brand: booking.vehicle.brand, model: booking.vehicle.model, year: booking.vehicle.year },
+        pickupAt: booking.pickupAt,
+        returnAt: booking.returnAt,
+        pickupLocation: booking.pickupLocation,
+        returnLocation: booking.returnLocation,
+        rentalDays: booking.rentalDays,
+        totalAmount: toNumber(booking.totalAmount),
+        securityDeposit: toNumber(booking.securityDeposit),
+      });
+    }
+
+    return booking;
   },
 };

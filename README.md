@@ -5,7 +5,7 @@ A full-stack, production-ready platform for a real car rental company. It has **
 - **Customer-facing website** (at the site root `/`) — browse the fleet with live availability and filters, view a car's photo gallery, and make a guest online booking.
 - **Staff dashboard** (under `/dashboard`, sign-in required) — fleet, bookings, rentals, customers, payments, maintenance, damage tracking, reporting and staff administration.
 
-A booking placed on the public site creates a real customer and a **pending booking that appears in the staff dashboard** for confirmation — using the exact same pricing, availability and no-double-booking logic as staff-created bookings.
+A booking placed on the public site creates a real customer and a **pending booking that appears in the staff dashboard** for confirmation — using the exact same pricing, availability and no-double-booking logic as staff-created bookings. The customer is emailed a confirmation when the booking is received and again when staff confirm it, and password resets are emailed too (see transactional email below).
 
 This is a real application, not a demo or prototype. Every number shown in the UI — dashboard statistics, booking totals, rental charges, reports — is computed and validated on the backend against PostgreSQL. The frontend never invents or hardcodes business data.
 
@@ -44,6 +44,8 @@ Edit `backend/.env` and set at minimum:
 - `JWT_SECRET` / `JWT_REFRESH_SECRET` — long random strings (generate with `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`)
 
 The full list of variables, with explanations, is in `backend/.env.example`.
+
+**Transactional email (optional).** Booking and password-reset emails are sent via SMTP. If you leave `SMTP_HOST` blank, the app does **not** send email — it logs each message (subject, recipient, and the reset link) to the server console instead, so every flow works locally without a provider. To send real email, set `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS` (SendGrid, Mailgun, Postmark, Amazon SES, or any SMTP server), `MAIL_FROM`, and `APP_URL` (your frontend's URL, used to build the reset link).
 
 ## 3. Generate the Prisma client and run migrations
 

@@ -10,6 +10,7 @@ import {
   verifyRefreshToken,
 } from "../../lib/jwt";
 import { env } from "../../config/env";
+import { sendPasswordResetEmail } from "../../lib/emails";
 import { AppError } from "../../utils/AppError";
 import { logActivity } from "../../utils/activityLog";
 import {
@@ -132,8 +133,11 @@ export const authService = {
       },
     });
 
-    // In production this token would be emailed to the user via a transactional email
-    // provider. Returned here so the reset flow is testable end-to-end without one.
+    // Email the reset link to the user (non-blocking; never throws). The raw
+    // token is also returned so the flow stays testable and so the controller
+    // can surface it OUTSIDE production when no mail provider is configured.
+    void sendPasswordResetEmail({ email: user.email, firstName: user.firstName, token: rawToken });
+
     return rawToken;
   },
 
