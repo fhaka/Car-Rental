@@ -1,6 +1,11 @@
 # V Car Rent — Car Rental Management System
 
-A full-stack, production-ready management platform for a real car rental company: fleet, bookings, rentals, customers, payments, maintenance, damage tracking, reporting and staff administration in one system.
+A full-stack, production-ready platform for a real car rental company. It has **two surfaces that share one backend and database**:
+
+- **Customer-facing website** (at the site root `/`) — browse the fleet with live availability and filters, view a car's photo gallery, and make a guest online booking.
+- **Staff dashboard** (under `/dashboard`, sign-in required) — fleet, bookings, rentals, customers, payments, maintenance, damage tracking, reporting and staff administration.
+
+A booking placed on the public site creates a real customer and a **pending booking that appears in the staff dashboard** for confirmation — using the exact same pricing, availability and no-double-booking logic as staff-created bookings.
 
 This is a real application, not a demo or prototype. Every number shown in the UI — dashboard statistics, booking totals, rental charges, reports — is computed and validated on the backend against PostgreSQL. The frontend never invents or hardcodes business data.
 
@@ -68,6 +73,14 @@ Seeded login credentials (all roles share the same password below; **change thes
 | Employee | `employee1@vcarrent.al` | `Password123!` |
 | Employee | `employee2@vcarrent.al` | `Password123!` |
 
+## 4b. Attach fleet photos (optional, recommended)
+
+```bash
+npm run seed:images --workspace=backend
+```
+
+This attaches the car photos bundled in `backend/uploads/vehicles/` to the seeded vehicles (one primary image each) so the public website and the dashboard show real photos instead of the gradient placeholders. The script is **idempotent** and matches image files to vehicles by license plate: to change a car's photo, drop a `<plateNumber>.jpg` into `backend/uploads/vehicles/` and re-run it. Staff can also manage photos from the dashboard (see below) — this step just gives the demo fleet a head start.
+
 ## 5. Run in development
 
 From the repository root, in two terminals:
@@ -77,7 +90,12 @@ npm run dev:backend    # http://localhost:4000
 npm run dev:frontend   # http://localhost:5173
 ```
 
-The frontend dev server proxies `/api` and `/uploads` to the backend, so no CORS configuration is needed locally. Visit `http://localhost:5173` and log in with one of the seeded accounts above.
+The frontend dev server proxies `/api` and `/uploads` to the backend, so no CORS configuration is needed locally. Then open:
+
+- **Public website:** `http://localhost:5173/` — home, `/fleet`, a car detail page with photo gallery, and the guest booking flow. No login required.
+- **Staff dashboard:** `http://localhost:5173/login` (or click **Staff login** in the header) → redirects to `/dashboard`. Sign in with one of the seeded accounts above.
+
+> **Port note:** if `5173` is already in use, Vite starts the frontend on the next free port (e.g. `5174`). Because the frontend calls the API cross-origin via `VITE_API_URL`, that new origin must be allowed by the backend's `CLIENT_ORIGIN` (it ships allowing both `http://localhost:5173` and `http://localhost:5174`). If you use a different port, add it to `CLIENT_ORIGIN` in `backend/.env` and restart the backend — otherwise the browser blocks every API call (which the UI surfaces as a generic "invalid credentials"/load error).
 
 Health check: `GET http://localhost:4000/api/health` → `{"status":"ok","service":"car-rental-api"}`
 
@@ -99,6 +117,41 @@ This runs `tsc` for the backend (emitting to `backend/dist`) and a type-checked 
 
 Start the built backend with `npm run start --workspace=backend`; serve `frontend/dist` with any static file host (Nginx, Caddy, a CDN, or a simple Express static handler) and point it at the deployed API's URL via `VITE_API_URL` at build time.
 
+## Public website
+
+The customer-facing site is served by the **same frontend app** (public routes at the root; the staff dashboard stays under `/dashboard`) and is backed by a **separate, unauthenticated** API module.
+
+**Public pages** (`frontend/src/public/`):
+
+| Route | Page |
+|---|---|
+| `/` | Home — hero with a date/location search, categories, featured cars, highlights |
+| `/fleet` | Fleet listing with filters (category, transmission, fuel, seats, price), sorting and date-aware availability |
+| `/fleet/:id` | Car detail with a photo **gallery** (thumbnails + prev/next + click-to-zoom lightbox) and pricing |
+| `/book/:vehicleId` | Guest booking form (live price estimate) → real pending booking + confirmation |
+| `/about`, `/contact` | Company info, rental terms, contact form |
+
+**Public API** (`/api/public/*`, no authentication, the booking endpoint is rate-limited) exposes only presentation-safe vehicle fields — never plate, VIN, mileage or documents:
+
+| Method & path | Purpose |
+|---|---|
+| `GET /api/public/company` | Public company details (name, contact, currency, policies) |
+| `GET /api/public/categories` | Active vehicle categories |
+| `GET /api/public/vehicles` | Browse/filter the rentable fleet (optional `pickupAt`/`returnAt` for availability) |
+| `GET /api/public/vehicles/:id` | A single vehicle's public detail |
+| `POST /api/public/bookings` | Guest booking — finds/creates the customer and creates a `PENDING` booking |
+
+Guest bookings reuse the staff `bookingsService.create`, so pricing, tax and the no-double-booking rule are identical; they are attributed to a synthetic inactive `online@vcarrent.al` user so staff can see at a glance that a booking came from the website.
+
+## Fleet photos & staff image management
+
+Vehicle photos are stored on disk in `backend/uploads/vehicles/` and served statically from `/uploads`. The primary image is the one shown on the public site.
+
+- **Seed/bulk:** `npm run seed:images --workspace=backend` (step 4b) attaches `<plateNumber>.jpg` files to vehicles.
+- **From the dashboard:** open a vehicle (**Vehicles → a car → Photos**) to **upload** (JPEG/PNG/WEBP/GIF, ≤ 8 MB, multiple at once), **set the primary** photo (shown on the public site), and **delete** photos (which also removes the file from disk and auto-promotes another primary).
+
+> Because the frontend is served from a different origin/port than the API in development, `app.ts` sets `Cross-Origin-Resource-Policy: cross-origin` on `/uploads` so the browser can embed the images. Without it, Helmet's default same-origin policy makes every `<img>` fail to load (while `curl` still succeeds).
+
 ## Project structure
 
 ```
@@ -106,20 +159,24 @@ car-rental-app/
 ├── backend/
 │   ├── prisma/
 │   │   ├── schema.prisma      # full relational schema: 20+ models, enums, indexes
-│   │   └── seed.ts            # realistic seed data
+│   │   ├── seed.ts            # realistic seed data
+│   │   └── seed-images.ts     # attaches uploads/vehicles/<plate>.jpg to vehicles
+│   ├── uploads/vehicles/      # fleet photos (served at /uploads, primary shown publicly)
 │   └── src/
 │       ├── config/            # env loading & validation
 │       ├── lib/                # prisma client, logger, jwt, password hashing
 │       ├── middleware/         # auth, validation, rate limiting, error handling
 │       ├── modules/            # one folder per domain (routes/controller/service/schemas)
+│       │   └── public/         # unauthenticated customer-site API (/api/public)
 │       ├── utils/               # pricing, pagination, AppError, id generators
 │       ├── app.ts / server.ts
-│       └── routes/index.ts     # mounts every module + /api/health
+│       └── routes/index.ts     # mounts every module + /api/public + /api/health
 └── frontend/
     └── src/
         ├── components/          # layout (sidebar/topbar) + reusable UI kit
         ├── features/            # one folder per domain: api.ts + TanStack Query hooks
-        ├── pages/                # route-level pages, grouped to match the sidebar
+        ├── pages/                # staff dashboard route-level pages (under /dashboard)
+        ├── public/              # customer-facing website (home, fleet, car detail, booking, gallery)
         ├── routes/               # ProtectedRoute / RoleGuard
         ├── store/                # auth store (Zustand, in-memory access token)
         └── types/                # shared TypeScript types mirroring the API
@@ -143,6 +200,7 @@ All endpoints are namespaced under `/api`. Every list endpoint supports `page`, 
 
 | Domain | Base path |
 |---|---|
+| **Public (no auth)** | `/api/public` (company, categories, vehicles, vehicles/:id, POST bookings) |
 | Auth | `/api/auth` (login, refresh, logout, forgot/reset password, me) |
 | Users (admin) | `/api/users` |
 | Vehicle categories | `/api/vehicle-categories` |
@@ -168,3 +226,9 @@ All endpoints are namespaced under `/api`. Every list endpoint supports `page`, 
 ## Deployment notes
 
 The backend is a plain Node/Express process with no host-specific coupling — it runs on any platform that gives you a Node runtime and a PostgreSQL connection (a VPS, Render, Railway, Fly.io, ECS, etc.). The frontend is a static Vite build servable from any static host or CDN. Set `CLIENT_ORIGIN` (backend) and `VITE_API_URL` (frontend) to your real domains, use strong unique JWT secrets, put the app behind HTTPS, and run `prisma migrate deploy` (not `migrate dev`) against your production database during deploys.
+
+Additional notes for the public site and photos:
+
+- `CLIENT_ORIGIN` must include the **exact origin the public site is served from** (it is a comma-separated allowlist). Since the public website and staff dashboard are the same build, that is a single origin.
+- Uploaded photos live on the server's local disk (`UPLOAD_DIR`, default `backend/uploads`). On ephemeral/containerised hosts use a persistent volume or move storage to object storage (e.g. S3) so photos survive restarts and scale across instances.
+- If you serve the static frontend from the **same origin** as the API (reverse proxy), the `/uploads` cross-origin header is harmless; if the API is on a **different origin**, that header (already set in `app.ts`) is what lets the browser load the images.
